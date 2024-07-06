@@ -497,7 +497,7 @@ class WhisperTranscriber:
 
         return config
 
-    def write_result(self, result: dict, source_name: str, output_dir: str, highlight_words: bool = False, caption: bool = False, source_path: str = None, fps: int = None):
+    def write_result(self, result: dict, source_name: str, output_dir: str, highlight_words: bool = False, caption: bool = False, source_path: str = None):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -510,7 +510,7 @@ class WhisperTranscriber:
         json_file = self.__create_file(json_result, output_dir, source_name + "-result.json")
         if caption:
             print("Created Caption file " + os.path.join(output_dir, source_path))
-            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4", fps=fps)
+            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
         else:
             captionFile = None
         print("Created JSON file " + json_file)
@@ -557,9 +557,9 @@ class WhisperTranscriber:
         segmentStream.seek(0)
         return segmentStream.read()
     
-    def __get_caption(self, segments: Iterator[dict], source_path: str, out_name: int, fps: int = False) -> str:
+    def __get_caption(self, segments: Iterator[dict], source_path: str, out_name: int) -> str:
 
-        captionurl = write_caption(segments, srcfilename=source_path, outfilename=out_name, fps=fps)
+        captionurl = write_caption(segments, srcfilename=source_path, outfilename=out_name)
 
         return captionurl
 
@@ -660,7 +660,7 @@ def create_ui(app_config: ApplicationConfig):
         *common_word_timestamps_inputs(),
         *common_diarization_inputs(),
         gr.Checkbox(label="Enable Caption", value=app_config.caption),
-        gr.File(label="Cookies File", file_count="single")
+        gr.File(label="Cookies File", file_count="single"),
     ], outputs=[
         gr.File(label="Download"),
         gr.Text(label="Transcription"), 

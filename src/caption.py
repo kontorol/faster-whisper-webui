@@ -148,7 +148,7 @@ def split_text_into_lines(data):
     return subtitles
 
 
-def write_caption(segments, srcfilename, outfilename, fps):
+def write_caption(segments, srcfilename, outfilename):
     wordlevel_info = []
     for segment in segments:
         for word in segment['words']:
@@ -198,5 +198,5 @@ def write_caption(segments, srcfilename, outfilename, fps):
     final_video = final_video.set_audio(input_video.audio)
 
     # Save the final clip as a video file with the audio included
-    final_video.write_videofile(outfilename, fps=fps, codec="libx264", audio_codec="aac")
+    final_video.write_videofile(outfilename, codec="libx264", audio_codec="aac")
     return outfilename
