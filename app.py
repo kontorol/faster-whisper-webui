@@ -266,7 +266,7 @@ class WhisperTranscriber:
                 for source in sources:
                     source_prefix = ""
                     source_audio_duration = source.get_audio_duration()
-                    source_audio_fps = source.get_audio_sample_rate()
+                    # source_audio_fps = source.get_audio_sample_rate()
 
                     if (len(sources) > 1):
                         # Prefix (minimum 2 digits)
@@ -290,7 +290,7 @@ class WhisperTranscriber:
                     # Update progress
                     current_progress += source_audio_duration
 
-                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words, caption, source, source_audio_fps)
+                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words, caption, source.source_path, None)
 
                     if len(sources) > 1:
                         # Add new line separators
@@ -509,8 +509,8 @@ class WhisperTranscriber:
         json_result = json.dumps(result, indent=4, ensure_ascii=False)
         json_file = self.__create_file(json_result, output_dir, source_name + "-result.json")
         if caption:
-            print("Created Caption file " + source_name + "-result.mp4")
-            captionFile = self.__get_caption(result["segments"], source_path, source_name + "-result.mp4", fps=fps)
+            print("Created Caption file " + os.path.join(output_dir, source_path))
+            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4", fps=fps)
         else:
             captionFile = None
         print("Created JSON file " + json_file)

@@ -29,7 +29,7 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
         destinationDirectory = mkdtemp()
 
     ydl_opts = {
-        "format": "bestaudio/best",
+        "format": "best[ext=mp4]/best",
         'paths': {
             'home': destinationDirectory
         }
