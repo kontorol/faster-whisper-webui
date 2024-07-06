@@ -508,16 +508,16 @@ class WhisperTranscriber:
         # We always create the JSON file for debugging purposes
         json_result = json.dumps(result, indent=4, ensure_ascii=False)
         json_file = self.__create_file(json_result, output_dir, source_name + "-result.json")
+        if caption:
+            print("Created Caption file " + source_name + "-result.mp4")
+            captionFile = self.__get_caption(result["segments"], source_path, source_name + "-result.mp4", fps=fps)
+        else:
+            captionFile = None
         print("Created JSON file " + json_file)
 
         print("Max line width " + str(languageMaxLineWidth))
         vtt = self.__get_subs(result["segments"], "vtt", languageMaxLineWidth, highlight_words=highlight_words)
         srt = self.__get_subs(result["segments"], "srt", languageMaxLineWidth, highlight_words=highlight_words)
-        
-        if caption:
-            captionFile = self.__get_caption(result["segments"], source_path, source_name + "-result.mp4", fps=fps)
-        else:
-            captionFile = None
 
         output_files = []
         output_files.append(self.__create_file(srt, output_dir, source_name + "-subs.srt"));
