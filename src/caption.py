@@ -148,9 +148,8 @@ def split_text_into_lines(data):
     return subtitles
 
 
-def write_caption(transcript, srcfilename, outfilename, fps):
+def write_caption(segments, srcfilename, outfilename, fps):
     wordlevel_info = []
-    segments = transcript['segments']
     for segment in segments:
         for word in segment['words']:
             wordlevel_info.append({'word':word['word'],'start': word['start'],'end':word['end']})
