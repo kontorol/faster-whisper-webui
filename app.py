@@ -33,6 +33,7 @@ import ffmpeg
 import gradio as gr
 
 from src.download import ExceededMaximumDuration, download_url
+from src.caption import write_caption
 from src.utils import optional_int, slugify, str2bool, write_srt, write_vtt
 from src.vad import AbstractTranscription, NonSpeechStrategy, PeriodicTranscriptionConfig, TranscriptionConfig, VadPeriodicTranscription, VadSileroTranscription
 from src.whisper.abstractWhisperContainer import AbstractWhisperContainer
@@ -120,6 +121,7 @@ class WhisperTranscriber:
                                          vad, vadMergeWindow, vadMaxMergeSize, 
                                          word_timestamps: bool = False, highlight_words: bool = False, 
                                          diarization: bool = False, diarization_speakers: int = 2,
+                                         caption: bool =  False, cookies: str = None,
                                          progress=gr.Progress()):
         
         vadOptions = VadOptions(vad, vadMergeWindow, vadMaxMergeSize, self.app_config.vad_padding, self.app_config.vad_prompt_window, self.app_config.vad_initial_prompt_mode)
@@ -130,7 +132,7 @@ class WhisperTranscriber:
             self.unset_diarization()
 
         return self.transcribe_webui(modelName, languageName, urlData, multipleFiles, microphoneData, task, vadOptions, 
-                                     word_timestamps=word_timestamps, highlight_words=highlight_words, progress=progress)
+                                     word_timestamps=word_timestamps, highlight_words=highlight_words, caption=caption, cookies=cookies, progress=progress)
 
     # Entry function for the full tab
     def transcribe_webui_full(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
@@ -141,7 +143,8 @@ class WhisperTranscriber:
                               condition_on_previous_text: bool, fp16: bool, temperature_increment_on_fallback: float, 
                               compression_ratio_threshold: float, logprob_threshold: float, no_speech_threshold: float,
                               diarization: bool = False, diarization_speakers: int = 2, 
-                              diarization_min_speakers = 1, diarization_max_speakers = 5):
+                              diarization_min_speakers = 1, diarization_max_speakers = 5,
+                              caption: bool = False, cookies: str = None):
         
         return self.transcribe_webui_full_progress(modelName, languageName, urlData, multipleFiles, microphoneData, task, 
                                 vad, vadMergeWindow, vadMaxMergeSize, vadPadding, vadPromptWindow, vadInitialPromptMode,
@@ -150,7 +153,7 @@ class WhisperTranscriber:
                                 condition_on_previous_text, fp16, temperature_increment_on_fallback,
                                 compression_ratio_threshold, logprob_threshold, no_speech_threshold,
                                 diarization, diarization_speakers, 
-                                diarization_min_speakers, diarization_max_speakers)
+                                diarization_min_speakers, diarization_max_speakers, caption, cookies)
 
     # Entry function for the full tab with progress
     def transcribe_webui_full_progress(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
@@ -162,7 +165,7 @@ class WhisperTranscriber:
                                         compression_ratio_threshold: float, logprob_threshold: float, no_speech_threshold: float, 
                                         diarization: bool = False, diarization_speakers: int = 2, 
                                         diarization_min_speakers = 1, diarization_max_speakers = 5,
-                                        progress=gr.Progress()):
+                                        caption: bool = False, cookies: str = None, progress=gr.Progress()):
 
         # Handle temperature_increment_on_fallback
         if temperature_increment_on_fallback is not None:
@@ -184,12 +187,12 @@ class WhisperTranscriber:
                                      condition_on_previous_text=condition_on_previous_text, fp16=fp16,
                                      compression_ratio_threshold=compression_ratio_threshold, logprob_threshold=logprob_threshold, no_speech_threshold=no_speech_threshold, 
                                      word_timestamps=word_timestamps, prepend_punctuations=prepend_punctuations, append_punctuations=append_punctuations, highlight_words=highlight_words,
-                                     progress=progress)
+                                     caption=caption, cookies=cookies, progress=progress)
 
     # Perform diarization given a specific input audio file and whisper file
     def perform_extra(self, languageName, urlData, singleFile, whisper_file: str, 
                       highlight_words: bool = False,
-                      diarization: bool = False, diarization_speakers: int = 2, diarization_min_speakers = 1, diarization_max_speakers = 5, progress=gr.Progress()):
+                      diarization: bool = False, diarization_speakers: int = 2, diarization_min_speakers = 1, diarization_max_speakers = 5, caption: bool = False, cookies:str = None, progress=gr.Progress()):
     
         if whisper_file is None:
             raise ValueError("whisper_file is required")
@@ -217,14 +220,14 @@ class WhisperTranscriber:
         # Will return download, text, vtt
         return self.transcribe_webui("base", "", urlData, multipleFiles, None, None, None, 
                                        progress=progress,highlight_words=highlight_words,
-                                       override_transcribe_file=custom_transcribe_file, override_max_sources=1)
+                                       override_transcribe_file=custom_transcribe_file, override_max_sources=1, caption=caption, cookies=cookies)
 
     def transcribe_webui(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
                          vadOptions: VadOptions, progress: gr.Progress = None, highlight_words: bool = False, 
-                         override_transcribe_file: Callable[[AudioSource], dict] = None, override_max_sources = None,
+                         override_transcribe_file: Callable[[AudioSource], dict] = None, override_max_sources = None, caption: bool = False, cookies: str = None,
                          **decodeOptions: dict):
         try:
-            sources = self.__get_source(urlData, multipleFiles, microphoneData)
+            sources = self.__get_source(urlData, multipleFiles, microphoneData, cookies)
 
             if override_max_sources is not None and len(sources) > override_max_sources:
                 raise ValueError("Maximum number of sources is " + str(override_max_sources) + ", but " + str(len(sources)) + " were provided")
@@ -263,6 +266,7 @@ class WhisperTranscriber:
                 for source in sources:
                     source_prefix = ""
                     source_audio_duration = source.get_audio_duration()
+                    source_audio_fps = source.get_audio_sample_rate()
 
                     if (len(sources) > 1):
                         # Prefix (minimum 2 digits)
@@ -286,7 +290,7 @@ class WhisperTranscriber:
                     # Update progress
                     current_progress += source_audio_duration
 
-                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words)
+                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words, caption, source, source_audio_fps)
 
                     if len(sources) > 1:
                         # Add new line separators
@@ -493,7 +497,7 @@ class WhisperTranscriber:
 
         return config
 
-    def write_result(self, result: dict, source_name: str, output_dir: str, highlight_words: bool = False):
+    def write_result(self, result: dict, source_name: str, output_dir: str, highlight_words: bool = False, caption: bool = False, source_path: str = None, fps: int = None):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -509,12 +513,18 @@ class WhisperTranscriber:
         print("Max line width " + str(languageMaxLineWidth))
         vtt = self.__get_subs(result["segments"], "vtt", languageMaxLineWidth, highlight_words=highlight_words)
         srt = self.__get_subs(result["segments"], "srt", languageMaxLineWidth, highlight_words=highlight_words)
+        
+        if caption:
+            captionFile = self.__get_caption(result["segments"], source_path, source_name + "-result.mp4", fps=fps)
+        else:
+            captionFile = None
 
         output_files = []
         output_files.append(self.__create_file(srt, output_dir, source_name + "-subs.srt"));
         output_files.append(self.__create_file(vtt, output_dir, source_name + "-subs.vtt"));
         output_files.append(self.__create_file(text, output_dir, source_name + "-transcript.txt"));
         output_files.append(json_file)
+        output_files.append(captionFile)
 
         return output_files, text, vtt
 
@@ -522,8 +532,8 @@ class WhisperTranscriber:
         self.model_cache.clear()
         self.vad_model = None
 
-    def __get_source(self, urlData, multipleFiles, microphoneData):
-        return get_audio_source_collection(urlData, multipleFiles, microphoneData, self.inputAudioMaxDuration)
+    def __get_source(self, urlData, multipleFiles, microphoneData, cookies):
+        return get_audio_source_collection(urlData, multipleFiles, microphoneData, self.inputAudioMaxDuration, cookies)
 
     def __get_max_line_width(self, language: str) -> int:
         if (language and language.lower() in ["japanese", "ja", "chinese", "zh"]):
@@ -546,6 +556,12 @@ class WhisperTranscriber:
 
         segmentStream.seek(0)
         return segmentStream.read()
+    
+    def __get_caption(self, segments: Iterator[dict], source_path: str, out_name: int, fps: int = False) -> str:
+
+        captionurl = write_caption(segments, srcfilename=source_path, outfilename=out_name, fps=fps)
+
+        return captionurl
 
     def __create_file(self, text: str, directory: str, fileName: str) -> str:
         # Write the text to a file
@@ -681,6 +697,8 @@ def create_ui(app_config: ApplicationConfig):
         *common_diarization_inputs(),
         gr.Number(label="Diarization - Min Speakers", precision=0, value=app_config.diarization_min_speakers, interactive=has_diarization_libs),
         gr.Number(label="Diarization - Max Speakers", precision=0, value=app_config.diarization_max_speakers, interactive=has_diarization_libs),
+        gr.Checkbox(label="Enable Caption", value=app_config.caption),
+        gr.File(label="Cookies File", file_count="single"),
 
     ], outputs=[
         gr.File(label="Download"),
@@ -699,6 +717,9 @@ def create_ui(app_config: ApplicationConfig):
         *common_diarization_inputs(),
         gr.Number(label="Diarization - Min Speakers", precision=0, value=app_config.diarization_min_speakers, interactive=has_diarization_libs),
         gr.Number(label="Diarization - Max Speakers", precision=0, value=app_config.diarization_max_speakers, interactive=has_diarization_libs),
+        gr.Checkbox(label="Enable Caption", value=app_config.caption),
+        gr.File(label="Cookies File", file_count="single"),
+
 
     ], outputs=[
         gr.File(label="Download"),

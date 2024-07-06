@@ -14,16 +14,16 @@ class FilenameCollectorPP(PostProcessor):
         self.filenames.append(information["filepath"])
         return [], information
 
-def download_url(url: str, maxDuration: int = None, destinationDirectory: str = None, playlistItems: str = "1") -> List[str]: 
+def download_url(url: str, maxDuration: int = None, destinationDirectory: str = None, playlistItems: str = "1", cookies: str = None) -> List[str]: 
     try:
-        return _perform_download(url, maxDuration=maxDuration, outputTemplate=None, destinationDirectory=destinationDirectory, playlistItems=playlistItems)
+        return _perform_download(url, maxDuration=maxDuration, outputTemplate=None, destinationDirectory=destinationDirectory, playlistItems=playlistItems, cookies=cookies)
     except yt_dlp.utils.DownloadError as e:
         # In case of an OS error, try again with a different output template
         if e.msg and e.msg.find("[Errno 36] File name too long") >= 0:
             return _perform_download(url, maxDuration=maxDuration, outputTemplate="%(title).10s %(id)s.%(ext)s")
         pass
 
-def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = None, destinationDirectory: str = None, playlistItems: str = "1"):
+def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = None, destinationDirectory: str = None, playlistItems: str = "1", cookies: str = None):
     # Create a temporary directory to store the downloaded files
     if destinationDirectory is None:
         destinationDirectory = mkdtemp()
@@ -34,6 +34,11 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
             'home': destinationDirectory
         }
     }
+
+    # Add cookie file if specified
+    if cookies:
+        ydl_opts['cookiefile'] = cookies
+
     if (playlistItems):
         ydl_opts['playlist_items'] = playlistItems
 

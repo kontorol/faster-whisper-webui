@@ -16,6 +16,7 @@ class AudioSource:
         self.source_path = source_path
         self.source_name = source_name
         self._audio_duration = audio_duration
+        self._audio_sample_rate = None
 
         # Load source name if not provided
         if (self.source_name is None):
@@ -27,6 +28,12 @@ class AudioSource:
             self._audio_duration = float(ffmpeg.probe(self.source_path)["format"]["duration"])
 
         return self._audio_duration
+
+    def get_audio_sample_rate(self):
+        if self._audio_sample_rate is None:
+            self._audio_sample_rate = int(ffmpeg.probe(self.source_path)["streams"][0]["sample_rate"])
+
+        return self._audio_sample_rate
 
     def get_full_name(self):
         return self.source_name
@@ -47,12 +54,12 @@ class AudioSourceCollection:
     def __iter__(self):
         return iter(self.sources)
 
-def get_audio_source_collection(urlData: str, multipleFiles: List, microphoneData: str, input_audio_max_duration: float = -1) -> List[AudioSource]:
+def get_audio_source_collection(urlData: str, multipleFiles: List, microphoneData: str, input_audio_max_duration: float = -1, cookies: str = None) -> List[AudioSource]:
     output: List[AudioSource] = []
 
     if urlData:
         # Download from YouTube. This could also be a playlist or a channel.
-        output.extend([ AudioSource(x) for x in download_url(urlData, input_audio_max_duration, playlistItems=None) ])
+        output.extend([ AudioSource(x) for x in download_url(urlData, input_audio_max_duration, playlistItems=None, cookies=cookies) ])
     else:
         # Add input files
         if (multipleFiles is not None):
