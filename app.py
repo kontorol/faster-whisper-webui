@@ -290,7 +290,7 @@ class WhisperTranscriber:
                     # Update progress
                     current_progress += source_audio_duration
 
-                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words, caption, source.source_path, None)
+                    source_download, source_text, source_vtt = self.write_result(result, filePrefix, outputDirectory, highlight_words, caption, source.source_path)
 
                     if len(sources) > 1:
                         # Add new line separators
@@ -508,11 +508,7 @@ class WhisperTranscriber:
         # We always create the JSON file for debugging purposes
         json_result = json.dumps(result, indent=4, ensure_ascii=False)
         json_file = self.__create_file(json_result, output_dir, source_name + "-result.json")
-        if caption:
-            print("Created Caption file " + os.path.join(output_dir, source_path))
-            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
-        else:
-            captionFile = None
+
         print("Created JSON file " + json_file)
 
         print("Max line width " + str(languageMaxLineWidth))
@@ -524,7 +520,10 @@ class WhisperTranscriber:
         output_files.append(self.__create_file(vtt, output_dir, source_name + "-subs.vtt"));
         output_files.append(self.__create_file(text, output_dir, source_name + "-transcript.txt"));
         output_files.append(json_file)
-        output_files.append(captionFile)
+        if caption:
+            print("Created Caption file " + os.path.join(output_dir, source_path))
+            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
+            output_files.append(captionFile)
 
         return output_files, text, vtt
 
