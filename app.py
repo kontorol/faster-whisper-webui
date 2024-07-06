@@ -110,11 +110,11 @@ class WhisperTranscriber:
     def transcribe_webui_simple(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
                                 vad, vadMergeWindow, vadMaxMergeSize, 
                                 word_timestamps: bool = False, highlight_words: bool = False,
-                                diarization: bool = False, diarization_speakers: int = 2):
+                                diarization: bool = False, diarization_speakers: int = 2, caption: bool = False, cookies: str = None):
         return self.transcribe_webui_simple_progress(modelName, languageName, urlData, multipleFiles, microphoneData, task, 
                                                      vad, vadMergeWindow, vadMaxMergeSize, 
                                                      word_timestamps, highlight_words, 
-                                                     diarization, diarization_speakers)
+                                                     diarization, diarization_speakers, caption, cookies)
     
     # Entry function for the simple tab progress
     def transcribe_webui_simple_progress(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
@@ -659,6 +659,8 @@ def create_ui(app_config: ApplicationConfig):
         *common_vad_inputs(),
         *common_word_timestamps_inputs(),
         *common_diarization_inputs(),
+        gr.Checkbox(label="Enable Caption", value=app_config.caption),
+        gr.File(label="Cookies File", file_count="single")
     ], outputs=[
         gr.File(label="Download"),
         gr.Text(label="Transcription"), 

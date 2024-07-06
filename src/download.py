@@ -29,10 +29,11 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
         destinationDirectory = mkdtemp()
 
     ydl_opts = {
-        "format": "best[ext=mp4]/best",
+        "format": "bestvideo+bestaudio/best",
         'paths': {
             'home': destinationDirectory
-        }
+        },
+        'merge_output_format': 'mp4',
     }
 
     # Add cookie file if specified

@@ -156,8 +156,6 @@ def write_caption(segments, srcfilename, outfilename, fps):
 
     linelevel_subtitles = split_text_into_lines(wordlevel_info)
 
-
-
     input_video = VideoFileClip(srcfilename)
     frame_size = input_video.size
 
