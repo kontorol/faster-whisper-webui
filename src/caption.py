@@ -89,12 +89,11 @@ USE_GPU = auto_detect_gpu() if USE_GPU is None else USE_GPU
 
 if USE_GPU:
     try:
+        # Initialize GPU-related libraries
         import cupy as cp
-        import moviepy_cuda
         from numba import jit, cuda
 
-        moviepy_cuda.init()
-
+        # Define a GPU-accelerated function using Numba
         @jit(target_backend='cuda')
         def apply_effect_gpu(frame, effect_type, t, duration):
             if effect_type == 'fade_in':
@@ -109,6 +108,7 @@ if USE_GPU:
                 return cp.rot90(cp.array(frame), k=int(angle / 90))
             return frame
 
+        # Custom GPU-enabled TextClip class
         class GPUTextClip(TextClip):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
@@ -125,9 +125,21 @@ if USE_GPU:
 
 if not USE_GPU:
     GPUTextClip = TextClip
-    apply_effect_gpu = apply_effect
-    print("Using CPU for processing.")
 
+    def apply_effect_gpu(frame, effect_type, t, duration):
+        if effect_type == 'fade_in':
+            return frame * min(1, t / duration)
+        elif effect_type == 'fade_out':
+            return frame * max(0, 1 - t / duration)
+        elif effect_type == 'scale':
+            scale = 0.5 + 0.5 * min(1, t / duration)
+            return frame.repeat(int(scale), axis=0).repeat(int(scale), axis=1)
+        elif effect_type == 'rotate':
+            angle = 360 * (t / duration)
+            return cp.rot90(frame, k=int(angle / 90))
+        return frame
+
+    print("Using CPU for processing.")
 
 def create_caption(textJSON, framesize, style_config=None, highlight=True):
     if style_config is None:
