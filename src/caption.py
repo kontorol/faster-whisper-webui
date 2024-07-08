@@ -199,11 +199,16 @@ def create_caption(textJSON, framesize, style_config=None, highlight=True):
         word_width, word_height = word_clip.size
         
         if line_width + word_width > max_line_width:
-            # Arrange words in the line (RTL or LTR)
-            arrange_line_words(line_words, x_buffer, y_pos, rtl, xy_textclips_positions, word_clips)
-            line_words = []
-            y_pos -= word_height * 1.5
-            line_width = 0
+            if line_words:
+                # Arrange words in the line (RTL or LTR)
+                arrange_line_words(line_words, x_buffer, y_pos, rtl, xy_textclips_positions, word_clips)
+                line_words = []
+                y_pos -= word_height * 1.5
+                line_width = 0
+            else:
+                y_pos -= word_height * 1.5
+                line_width = 0
+
         
         line_words.append({
             "clip": word_clip,
@@ -233,6 +238,9 @@ def create_caption(textJSON, framesize, style_config=None, highlight=True):
     return word_clips, xy_textclips_positions
 
 def arrange_line_words(line_words, x_buffer, y_pos, rtl, xy_textclips_positions, word_clips):
+    if not line_words:
+        return 
+    
     if rtl:
         line_words.reverse()
     
@@ -277,6 +285,7 @@ def burn_caption(segments, srcfilename, outfilename, style_config=None):
     linelevel_subtitles = split_text_into_lines(wordlevel_info)
     input_video = VideoFileClip(srcfilename)
     frame_size = input_video.size
+    fps = input_video.fps
     all_linelevel_splits = []
 
     for line in linelevel_subtitles:
@@ -301,7 +310,7 @@ def burn_caption(segments, srcfilename, outfilename, style_config=None):
 
     final_video = CompositeVideoClip([input_video] + all_linelevel_splits)
     final_video = final_video.set_audio(input_video.audio)
-    final_video.write_videofile(outfilename, codec="libx264", audio_codec="aac", gpu=USE_GPU)
+    final_video.write_videofile(outfilename, fps=fps, codec="libx264", audio_codec="aac")
     return outfilename
 
 
