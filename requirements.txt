@@ -8,7 +8,10 @@ yt-dlp
 torchaudio
 altair
 json5
-
+moviepy==2.0.0.dev2
+imageio==2.25.1
+python-bidi
+arabic_reshaper
 # Needed by diarization
 intervaltree
 srt
