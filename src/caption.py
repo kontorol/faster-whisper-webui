@@ -1,6 +1,7 @@
 
 from moviepy.editor import TextClip, CompositeVideoClip, ColorClip, concatenate_videoclips,VideoFileClip
 import numpy as np
+import ffmpeg
 
 def create_caption(textJSON, framesize,font = "Helvetica",color='white', highlight_color='yellow',stroke_color='black',stroke_width=1.5):
     wordcount = len(textJSON['textcontents'])
@@ -83,7 +84,6 @@ def create_caption(textJSON, framesize,font = "Helvetica",color='white', highlig
 
     return word_clips,xy_textclips_positions
 
-
 def split_text_into_lines(data):
 
     MaxChars = 30
@@ -147,8 +147,26 @@ def split_text_into_lines(data):
 
     return subtitles
 
+def all_segments_have_words(segments):
+
+    if not isinstance(segments, list):
+        return False
+    
+    return all(
+        isinstance(segment, dict) and
+        'words' in segment and
+        isinstance(segment['words'], list) and
+        len(segment['words']) > 0
+        for segment in segments
+    )
 
 def write_caption(segments, srcfilename, outfilename):
+    if all_segments_have_words(segments):
+        burn_json_caption(segments, srcfilename, outfilename)
+    else:
+        burn_srt_caption(segments, srcfilename, outfilename)
+
+def burn_json_caption(segments, srcfilename, outfilename):
     wordlevel_info = []
     for segment in segments:
         for word in segment['words']:
@@ -200,3 +218,14 @@ def write_caption(segments, srcfilename, outfilename):
     # Save the final clip as a video file with the audio included
     final_video.write_videofile(outfilename, codec="libx264", audio_codec="aac")
     return outfilename
+
+def burn_srt_caption(video_file, srt_file, output_file):
+    input_video = ffmpeg.input(video_file)
+    
+    video = input_video.video.filter('subtitles', filename=srt_file, force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H000000000,BorderStyle=3')
+    audio = input_video.audio
+
+    output = ffmpeg.output(video, audio, output_file, vcodec='libx264', acodec='aac')
+    
+    ffmpeg.run(output, overwrite_output=True)
+    return output_file
