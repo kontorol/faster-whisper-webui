@@ -33,7 +33,7 @@ import ffmpeg
 import gradio as gr
 
 from src.download import ExceededMaximumDuration, download_url
-from src.caption import all_segments_have_words, burn_json_caption, burn_srt_caption
+from src.caption import burn_caption
 from src.utils import optional_int, slugify, str2bool, write_srt, write_vtt
 from src.vad import AbstractTranscription, NonSpeechStrategy, PeriodicTranscriptionConfig, TranscriptionConfig, VadPeriodicTranscription, VadSileroTranscription
 from src.whisper.abstractWhisperContainer import AbstractWhisperContainer
@@ -520,19 +520,33 @@ class WhisperTranscriber:
         output_files.append(self.__create_file(vtt, output_dir, source_name + "-subs.vtt"));
         output_files.append(self.__create_file(text, output_dir, source_name + "-transcript.txt"));
         output_files.append(json_file)
-        if caption and all_segments_have_words(result["segments"]):
-            print("Created Json Caption file " + os.path.join(output_dir, source_path))
-            captionFile = burn_json_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
-            output_files.append(captionFile)
-        else:
-            print("Created Srt Caption file " + os.path.join(output_dir, source_path))
-            captionFile = burn_srt_caption(os.path.join(output_dir, source_name + "-subs.srt"), os.path.join(output_dir, source_path), source_name + "-result.mp4")
-            output_files.append(captionFile)
-
-        # if caption:
-        #     print("Created Caption file " + os.path.join(output_dir, source_path))
-        #     captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
+        # if caption and all_segments_have_words(result["segments"]):
+        #     print("Created Json Caption file " + os.path.join(output_dir, source_path))
+        #     captionFile = burn_json_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4")
         #     output_files.append(captionFile)
+        # else:
+        #     print("Created Srt Caption file " + os.path.join(output_dir, source_path))
+        #     captionFile = burn_srt_caption(os.path.join(output_dir, source_name + "-subs.srt"), os.path.join(output_dir, source_path), source_name + "-result.mp4")
+        #     output_files.append(captionFile)
+
+        if caption:
+            print("Created Caption file " + os.path.join(output_dir, source_path))
+
+            style_config = {
+                'font': "Arial",
+                'rtl': False,
+                # 'font_file': 'path/to/your/persian_font.ttf',
+                # 'fontsize': 30,
+                'color': 'white',
+                'highlight_color': 'yellow',
+                'stroke_color': 'black',
+                'stroke_width': 1.5,
+                'bg_color': (64, 64, 64, 128),
+                'effect': None,
+            }
+
+            captionFile = self.__get_caption(result["segments"], os.path.join(output_dir, source_path), source_name + "-result.mp4", style_config)
+            output_files.append(captionFile)
 
         return output_files, text, vtt
 
@@ -565,9 +579,9 @@ class WhisperTranscriber:
         segmentStream.seek(0)
         return segmentStream.read()
     
-    def __get_caption(self, segments: Iterator[dict], source_path: str, out_name: int) -> str:
+    def __get_caption(self, segments: Iterator[dict], source_path: str, out_name: int, style_config = None) -> str:
 
-        captionurl = write_caption(segments, srcfilename=source_path, outfilename=out_name)
+        captionurl = burn_caption(segments, srcfilename=source_path, outfilename=out_name, style_config=style_config)
 
         return captionurl
 
