@@ -1,3 +1,4 @@
+import gc
 from moviepy.editor import *
 from moviepy.video.tools.subtitles import SubtitlesClip
 import numpy as np
@@ -270,9 +271,8 @@ def arrange_line_words(line_words, x_buffer, y_pos, rtl, xy_textclips_positions,
             x_pos += word['width'] + word['clip'].w * 0.2
 
 
-def burn_caption(segments, srcfilename, outfilename, style_config=None):
+def burn_caption(segments, srcfilename, outfilename, style_config=None, chunk_duration=60):
     has_words = all_segments_have_words(segments)
-    
     wordlevel_info = []
     if has_words:
         for segment in segments:
@@ -283,36 +283,64 @@ def burn_caption(segments, srcfilename, outfilename, style_config=None):
             wordlevel_info.append({'word': segment.get('text', ''), 'start': segment.get('start', 0), 'end': segment.get('end', 0)})
 
     linelevel_subtitles = split_text_into_lines(wordlevel_info)
+
     input_video = VideoFileClip(srcfilename)
     frame_size = input_video.size
     fps = input_video.fps
-    all_linelevel_splits = []
+    duration = input_video.duration
 
-    for line in linelevel_subtitles:
-        out_clips, positions = create_caption(line, frame_size, style_config, highlight=has_words)
+    temp_files = []
+    for chunk_start in np.arange(0, duration, chunk_duration):
+        chunk_end = min(chunk_start + chunk_duration, duration)
+        chunk_video = input_video.subclip(chunk_start, chunk_end)
         
-        max_width = max(position['x_pos'] + position['width'] for position in positions) if positions else 0
-        max_height = max(position['y_pos'] + position['height'] for position in positions) if positions else 0
-
-        if style_config and 'bg_color' in style_config:
-            color_clip = ColorClip(size=(int(max_width*1.1), int(max_height*1.1)),
-                                   color=style_config['bg_color'])
+        chunk_subtitles = [sub for sub in linelevel_subtitles if chunk_start <= sub['start'] < chunk_end]
+        
+        all_linelevel_splits = []
+        for line in chunk_subtitles:
+            out_clips, positions = create_caption(line, frame_size, style_config, highlight=has_words)
+            
+            if positions:
+                max_width = max(position['x_pos'] + position['width'] for position in positions)
+                max_height = max(position['y_pos'] + position['height'] for position in positions)
+                
+                color_clip = ColorClip(size=(int(max_width*1.1), int(max_height*1.1)),
+                                       color=style_config.get('bg_color', (64, 64, 64, 128)))
+                color_clip = color_clip.set_opacity(.6)
+                color_clip = color_clip.set_start(line['start'] - chunk_start).set_duration(line['end'] - line['start'])
+                
+                clip_to_overlay = CompositeVideoClip([color_clip] + out_clips)
+                clip_to_overlay = clip_to_overlay.set_position(("center", "bottom"))
+                all_linelevel_splits.append(clip_to_overlay)
+        
+        if all_linelevel_splits:
+            final_chunk = CompositeVideoClip([chunk_video] + all_linelevel_splits)
         else:
-            color_clip = ColorClip(size=(int(max_width*1.1), int(max_height*1.1)),
-                                   color=(64, 64, 64, 128))
+            final_chunk = chunk_video
+        final_chunk = final_chunk.set_audio(chunk_video.audio)
         
-        color_clip = color_clip.set_opacity(.6)
-        color_clip = color_clip.set_start(line['start']).set_duration(line['end']-line['start'])
+        temp_filename = f"temp_chunk_{chunk_start}.mp4"
+        final_chunk.write_videofile(temp_filename, fps=fps, codec="libx264", audio_codec="aac")
+        temp_files.append(temp_filename)
+        
+        # Clear memory
+        del final_chunk, chunk_video, all_linelevel_splits, out_clips
+        gc.collect()
 
-        clip_to_overlay = CompositeVideoClip([color_clip] + out_clips)
-        clip_to_overlay = clip_to_overlay.set_position(("center", "bottom"))
-        all_linelevel_splits.append(clip_to_overlay)
+    # Concatenate all chunks
+    clips = [VideoFileClip(filename) for filename in temp_files]
+    final_video = concatenate_videoclips(clips)
+    final_video.write_videofile(outfilename, fps=fps, codec="h264_nvenc", audio_codec="aac")
 
-    final_video = CompositeVideoClip([input_video] + all_linelevel_splits)
-    final_video = final_video.set_audio(input_video.audio)
-    final_video.write_videofile(outfilename, fps=fps, codec="libx264", audio_codec="aac")
+    # Clean up temporary files
+    for clip in clips:
+        clip.close()
+    for temp_file in temp_files:
+        os.remove(temp_file)
+
+    input_video.close()
+
     return outfilename
-
 
 
 # style_config = {
