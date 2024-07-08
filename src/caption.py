@@ -272,6 +272,7 @@ def arrange_line_words(line_words, x_buffer, y_pos, rtl, xy_textclips_positions,
 
 
 def burn_caption(segments, srcfilename, outfilename, style_config=None, chunk_duration=60):
+    threads = os.cpu_count()
     has_words = all_segments_have_words(segments)
     wordlevel_info = []
     if has_words:
@@ -320,7 +321,7 @@ def burn_caption(segments, srcfilename, outfilename, style_config=None, chunk_du
         final_chunk = final_chunk.set_audio(chunk_video.audio)
         
         temp_filename = f"temp_chunk_{chunk_start}.mp4"
-        final_chunk.write_videofile(temp_filename, fps=fps, codec="libx264", audio_codec="aac")
+        final_chunk.write_videofile(temp_filename, fps=fps, codec="libx264", audio_codec="aac", threads=threads)
         temp_files.append(temp_filename)
         
         # Clear memory
@@ -330,7 +331,7 @@ def burn_caption(segments, srcfilename, outfilename, style_config=None, chunk_du
     # Concatenate all chunks
     clips = [VideoFileClip(filename) for filename in temp_files]
     final_video = concatenate_videoclips(clips)
-    final_video.write_videofile(outfilename, fps=fps, codec="h264_nvenc", audio_codec="aac")
+    final_video.write_videofile(outfilename, fps=fps, codec="libx264", audio_codec="aac", threads=threads)
 
     # Clean up temporary files
     for clip in clips:
